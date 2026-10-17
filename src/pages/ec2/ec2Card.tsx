@@ -21,7 +21,7 @@ export const EC2Card = ({
   const [status, setStatus] = useState("loading");
   const [instanceId, setInstanceId] = useState("unknown");
   const [actionLoading, setActionLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<null | string>(null);
 
   const fetchStatus = async () => {
     try {

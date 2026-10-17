@@ -19,12 +19,20 @@
       "package": "com.abhi6676.ec2manager"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro",
+      "output": "static"
     },
     "extra": {
       "eas": {
         "projectId": "56480f98-16d6-4d4e-b568-0ddb316b1095"
       }
-    }
+    },
+    "experiments": {
+      "baseUrl": "/ec2-manager"
+    },
+    "plugins": [
+      "expo-router"
+    ]
   }
 }
