@@ -8,6 +8,8 @@ import {
 } from "react-native";
 
 const API_BASE_URL = "https://2og55qbwjb.execute-api.ap-south-1.amazonaws.com";
+const GODADDY_PAT_TOKEN =
+  "gd_pat_7tAIjj9PWQHdPvtAQalKmYmk30ASURo4SggFN7F9u6v_f56944b6";
 
 type action_i = "status" | "start" | "stop" | "reboot";
 
@@ -20,27 +22,63 @@ export const EC2Card = ({
 }) => {
   const [status, setStatus] = useState("loading");
   const [instanceId, setInstanceId] = useState("unknown");
+  const [publicIp, setPublicIp] = useState<string | undefined>(undefined);
+  const [dnsIp, setDnsIp] = useState<string | undefined>(undefined);
+  const [dnsRecordId, setDnsRecordId] = useState<string | undefined>(undefined);
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState<null | string>(null);
 
-  const fetchStatus = async () => {
+  const fetchEc2Status = async () => {
     try {
       setError(null);
       const response = await fetch(
         `${API_BASE_URL}/manage-ec2?name=${instanceName}&action=status`,
-      );
-      const data = await response.json();
-      if (response.ok) {
-        setStatus(data.current_state);
-        setInstanceId(data.instance_id || "unknown");
-      } else {
-        setError(data.error || "Failed to fetch status");
-        setStatus("error");
-      }
+      )
+        .then(async (ec2Res) => {
+          const data = await ec2Res.json();
+          if (ec2Res.ok) {
+            console.log("EC2 status is", data);
+            setStatus(data.current_state);
+            setInstanceId(data.instance_id || "unknown");
+            setPublicIp(data.public_ip);
+          } else throw ec2Res;
+        })
+        .catch((ec2Err) => {
+          setError(ec2Err.error || "Failed to fetch status");
+          setStatus("error");
+        });
     } catch (err) {
       setError("Network error connecting to API");
       setStatus("error");
     }
+  };
+
+  const fetchDnsStatus = async () => {
+    const url = new URL(
+      `https://api.godaddy.com/v3/domains/zones/sternetsmart.com/dns-records`,
+    );
+    url.searchParams.set("type", "A");
+    url.searchParams.set("name", instanceName);
+    const response = await fetch(url, {
+      headers: { Authorization: `Bearer ${GODADDY_PAT_TOKEN}` },
+    })
+      .then(async (res) => {
+        const data = await res.json();
+        if (
+          res.ok &&
+          data?.items &&
+          Array.isArray(data.items) &&
+          data.items?.length
+        ) {
+          const dnsStatus = data.items[0];
+          console.log("DNS status is", dnsStatus);
+          setDnsIp(dnsStatus.data);
+          setDnsRecordId(dnsStatus.recordId);
+        } else throw res;
+      })
+      .catch((err) => {
+        console.log("error fetching DNS IP record", err);
+      });
   };
 
   const handleAction = async (actionType: action_i) => {
@@ -53,7 +91,7 @@ export const EC2Card = ({
       const data = await response.json();
       if (response.ok) {
         setStatus(data.current_state || "updating");
-        setTimeout(fetchStatus, 1500);
+        setTimeout(fetchEc2Status, 1500);
       } else {
         setError(data.error || `Failed to ${actionType} instance`);
       }
@@ -65,8 +103,11 @@ export const EC2Card = ({
   };
 
   useEffect(() => {
-    fetchStatus();
-    const interval = setInterval(fetchStatus, 5000);
+    fetchEc2Status();
+    const interval = setInterval(async () => {
+      fetchEc2Status();
+      fetchDnsStatus();
+    }, 5000);
     return () => clearInterval(interval);
   }, [instanceName]);
 
@@ -116,13 +157,23 @@ export const EC2Card = ({
     >
       <View style={styles.cardHeader}>
         <Text style={styles.displayName}>{displayName}</Text>
-        <TouchableOpacity onPress={fetchStatus} style={styles.refreshButton}>
+        <TouchableOpacity onPress={fetchEc2Status} style={styles.refreshButton}>
           <Text style={styles.refreshText}>🔄</Text>
         </TouchableOpacity>
       </View>
 
       <Text style={styles.metaText}>
         Tag: {instanceName} • ID: {instanceId}
+      </Text>
+
+      <View style={{ display: "flex", flexDirection: "row" }}>
+        <Text style={styles.metaText}>IP - {publicIp}</Text>
+        <Text style={[styles.metaText, { marginLeft: 10 }]}>
+          | DNS IP - {dnsIp}
+        </Text>
+      </View>
+      <Text style={styles.metaText}>
+        IP {publicIp && dnsIp && publicIp == dnsIp ? "Match" : "Mismatch"}
       </Text>
 
       <View style={styles.statusBox}>

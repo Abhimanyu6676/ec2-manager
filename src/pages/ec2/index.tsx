@@ -4,8 +4,8 @@ import { EC2Card } from "./ec2Card";
 
 const INITIAL_INSTANCES = [
   { name: "dev", displayName: "Development Server" },
-  { name: "openalgo", displayName: "Openalgo Server" },
-  { name: "trade-dev", displayName: "Trade Dev Server" },
+  //{ name: "openalgo", displayName: "Openalgo Server" },
+  //{ name: "trade-dev", displayName: "Trade Dev Server" },
 ];
 
 const Ec2Container = () => {
